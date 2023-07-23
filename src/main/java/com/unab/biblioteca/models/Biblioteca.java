@@ -1,6 +1,7 @@
 package com.unab.biblioteca.models;
 
 import com.unab.biblioteca.enums.Estados;
+import com.unab.biblioteca.enums.Prestamos;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -21,7 +22,10 @@ public class Biblioteca {
     }
 
     public Biblioteca() {
-
+        librosDisponibles = new ArrayList<>();
+        usuariosRegistrados = new ArrayList<>();
+        prestamos = new ArrayList<>();
+        librosPrestados = new ArrayList<>();
     }
 
     public List<Libro> getLibrosDisponibles() {
@@ -70,6 +74,9 @@ public class Biblioteca {
         this.librosDisponibles.add(libro);
     }
 
+    public void agregarUsuario(Usuario usuario){this.usuariosRegistrados.add(usuario);}
+
+
     public List<Libro> buscarLibroPorTitulo(String titulo){
         List<Libro> lst = new ArrayList<>(this.librosDisponibles);;
         List<Libro> matches = new ArrayList<Libro>();
@@ -81,6 +88,12 @@ public class Biblioteca {
             if(item.getTitulo().contains(titulo))
                 matches.add(item);
         });
+
+        System.out.println("Libros encontrados para el título: " + titulo);
+        for (Libro libro : matches) {
+            System.out.println("Título: " + libro.getTitulo() + ", Autor: " + libro.getAutor());
+        }
+
         return matches;
     }
     public List<Libro> buscarLibroPorAutor(String autor){
@@ -89,14 +102,21 @@ public class Biblioteca {
         this.prestamos.forEach((prestamo)->{
             lst.add(prestamo.getLibro());
         });
+
         lst.forEach((item)->{
             if(item.getAutor().contains(autor))
+                System.out.println(item);
                 matches.add(item);
         });
+
+        System.out.println("Libros encontrados para el autor: " + autor);
+        for (Libro libro : matches) {
+            System.out.println("Título: " + libro.getTitulo() + ", Autor: " + libro.getAutor());
+        }
         return matches;
     }
 
-    public Boolean prestarLibro(Usuario usuario, Libro libro, Date fechaPrestamo){
+    public Boolean prestarLibro(Integer id, Usuario usuario, Libro libro, Date fechaInicioPrestamo, Date fechaFinPrestamo, double costoPorDia){
 
         if(!this.librosDisponibles.contains(libro))
             return false;
@@ -104,7 +124,7 @@ public class Biblioteca {
         usuario.solicitarLibro(libro);
         this.librosDisponibles.remove(libro);
         this.librosPrestados.add(libro);
-        this.prestamos.add(new Prestamo(libro, fechaPrestamo, usuario));
+        this.prestamos.add(new Prestamo(id, libro, fechaInicioPrestamo, fechaFinPrestamo, usuario, costoPorDia, Prestamos.EN_CURSO));
         libro.setEstado(Estados.PRESTADO);
         return true;
     }
@@ -152,7 +172,7 @@ public class Biblioteca {
         System.out.println("Prestamos vencidos: ");
         Date hoy = new Date();
         for(Prestamo prestamo : this.prestamos){
-            long diffInMillies = Math.abs(prestamo.getFechaPrestamo().getTime() - hoy.getTime());
+            long diffInMillies = Math.abs(prestamo.getFechaInicioPrestamo().getTime() - hoy.getTime());
             long diff = TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS);
             if(diff >= 30){
                 System.out.println(prestamo.toString());
@@ -164,6 +184,44 @@ public class Biblioteca {
         for(Usuario usuario : this.usuariosRegistrados){
             System.out.println("Nombre usuario: "+usuario.getNombre()+" cantidad de libros: "+usuario.getLibros().size());
         }
+    }
+
+    public void reservarLibroPrestado(Usuario usuario, Libro libro) {
+        if (librosPrestados.contains(libro) && !librosReservados.containsKey(usuario)) {
+            librosReservados.put(usuario, libro);
+            System.out.println(usuario.getNombre() + " ha reservado el libro '" + libro.getTitulo() + "'.");
+        } else {
+            System.out.println("El libro '" + libro.getTitulo() + "' no está prestado o el usuario ya lo tiene reservado.");
+        }
+    }
+
+    public void notificarLibroDisponible(Libro libro) {
+        Iterator<Map.Entry<Usuario, Libro>> iterator = librosReservados.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Usuario, Libro> entry = iterator.next();
+            if (entry.getValue().equals(libro)) {
+                Usuario usuario = entry.getKey();
+                System.out.println("El libro '" + libro.getTitulo() + "' está disponible para " + usuario.getNombre() + ". Puede pasar a recogerlo.");
+                iterator.remove();
+                break;
+            }
+        }
+    }
+
+
+    public List<Prestamo> obtenerPrestamosVencidos() {
+        List<Prestamo> prestamosVencidos = new ArrayList<>();
+        Date fechaActual = new Date();
+
+        for (Prestamo prestamo : prestamos) {
+            Date fechaFinPrestamo = prestamo.getFechaFinPrestamo();
+            long diferenciaDias = (fechaActual.getTime() - fechaFinPrestamo.getTime()) / (24 * 60 * 60 * 1000);
+            if (diferenciaDias > 30) {
+                prestamosVencidos.add(prestamo);
+            }
+        }
+
+        return prestamosVencidos;
     }
 
 }
